@@ -1,0 +1,146 @@
+---
+title: "UCSD_handler"
+author: "Quanyuan He"
+date: "2018/8/9"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+knitr::opts_chunk$set(echo = TRUE)
+opts_chunk$set(fig.align = "center", echo=FALSE, out.width = '70%')
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+### Download table filese manually from UCSC genome browser table
+``````{r}
+UCSC_TAB_BROWSER = 'https://genome.ucsc.edu/cgi-bin/hgTables?hgsid=685867399_zetljl5Cf4OAAnBla4jSmBE8EHB1'
+UCSC_GB_WORKDIR = '/Users/quanyuanhe/OneDrive/MyProjects/repetative_seq/data_source/our_database/UCSC'
+```
+```{r, out.width = '60%', fig.cap="UCSC_GB_hg38_GENE_TAB"}
+UCSC_GB_hg38_GENE_TAB = paste(UCSC_GB_WORKDIR,'hg38_gene.tab',sep='/')
+#Loading data to dataframe
+hg38_gene_tab = read.csv(UCSC_GB_hg38_GENE_TAB, nrows=-1, header = FALSE, sep = "\t", comment.char="#", quote = "\"'", row.names = NULL)
+colnames(hg38_gene_tab) = c('name','chrom','strand','txStart','txEnd','cdsStart','cdsEnd','exonCount','exonStarts',
+              'exonEnds','proteinID','alignID','kgID','spID','geneSymbol','protAcc','description')
+# Show the setting of data downloading
+knitr::include_graphics('/Users/quanyuanhe/OneDrive/MyProjects/repetative_seq/data_source/our_database/UCSC/images/hg38_gene.png')
+knitr::include_graphics('/Users/quanyuanhe/OneDrive/MyProjects/repetative_seq/data_source/our_database/UCSC/images/hg38_gene_2.png')
+
+```
+
+```{r, out.width = '60%', fig.cap="UCSC_GB_hg38_RE_TAB"}
+UCSC_GB_hg38_RE_TAB = paste(UCSC_GB_WORKDIR,'hg38_re.tab',sep='/')
+
+hg38_re_tab = read.csv(UCSC_GB_hg38_RE_TAB, nrows=-1, header = FALSE, sep = "\t", comment.char="#", quote = "\"'", row.names = NULL)
+colnames(hg38_re_tab) = c('bin','swScore','milliDiv','milliDel','milliIns','genoName','genoStart','genoEnd','genoLeft','strand',
+              'repName','repClass','repFamily','repStart','repEnd','repLeft','id')
+
+knitr::include_graphics('/Users/quanyuanhe/OneDrive/MyProjects/repetative_seq/data_source/our_database/UCSC/images/hg38_re.png')
+```
+```{r, out.width = '60%', fig.cap="UCSC_GB_mm10_GENE_TAB"}
+UCSC_GB_mm10_GENE_TAB = paste(UCSC_GB_WORKDIR,'mm10_gene.tab',sep='/')
+
+mm10_gene_tab = read.csv(UCSC_GB_mm10_GENE_TAB, nrows=-1, header = FALSE, sep = "\t", comment.char="#", quote = "\"'", row.names = NULL)
+colnames(mm10_gene_tab) = c('name','chrom','strand','txStart','txEnd','cdsStart','cdsEnd','exonCount','exonStarts',
+              'exonEnds','proteinID','alignID')
+
+knitr::include_graphics('/Users/quanyuanhe/OneDrive/MyProjects/repetative_seq/data_source/our_database/UCSC/images/mm10_gene.png')
+knitr::include_graphics('/Users/quanyuanhe/OneDrive/MyProjects/repetative_seq/data_source/our_database/UCSC/images/mm10_gene_2.png')
+```
+
+```{r, out.width = '60%', fig.cap="UCSC_GB_mm10_RE_TAB"}
+UCSC_GB_mm10_RE_TAB = paste(UCSC_GB_WORKDIR,'mm10_re.tab',sep='/')
+knitr::include_graphics('/Users/quanyuanhe/OneDrive/MyProjects/repetative_seq/data_source/our_database/UCSC/images/mm10_re.png')
+mm10_re_tab = read.csv(UCSC_GB_mm10_RE_TAB, nrows=-1, header = FALSE, sep = "\t", comment.char="#", quote = "\"'", row.names = NULL)
+colnames(mm10_re_tab) = c('bin','swScore','milliDiv','milliDel','milliIns','genoName','genoStart','genoEnd','genoLeft','strand',
+              'repName','repClass','repFamily','repStart','repEnd','repLeft','NA','id')
+```
+## Filter Repetitve Elements to get full-length REVs
+## using repNames which should  -int and the match ration is above 80%
+```{r}
+
+# Get HMM model length
+pos_temp = hg38_re_tab$repEnd - hg38_re_tab$repLeft
+pos_temp[hg38_re_tab$strand=='-']=0
+neg_temp = hg38_re_tab$repEnd - hg38_re_tab$repStart
+neg_temp[hg38_re_tab$strand=='+']=0
+hg38_re_tab$mode_length = pos_temp+neg_temp
+
+# Get length of RE sequences
+hg38_re_tab$re_length = hg38_re_tab$genoEnd-hg38_re_tab$genoStart+1
+# Filter with percentage of sequences (80%)
+hg38_re_tab_full = hg38_re_tab[hg38_re_tab$re_length/hg38_re_tab$mode_length>0.8,]
+
+#For LINE1 and LINE2
+hg38_re_full_LINE = hg38_re_tab_full[grepl("L1|L2|CR1", hg38_re_tab_full$repFamily),]
+hist(hg38_re_full_LINE$re_length, breaks=20)
+hg38_re_full_LINE = hg38_re_full_LINE[hg38_re_full_LINE$re_length>5000,]
+hist(hg38_re_full_LINE$re_length, breaks=20)
+
+#For ERVS
+hg38_re_full_ERV = hg38_re_tab_full[grepl(c("ERV"), hg38_re_tab_full$repFamily),]
+hist(hg38_re_full_ERV$re_length, breaks=20)
+hg38_re_full_ERV = hg38_re_full_ERV[hg38_re_full_ERV$re_length>5000 ,]
+hg38_re_full_ERV = hg38_re_full_ERV[hg38_re_full_ERV$re_length<9000 ,]
+hist(hg38_re_full_ERV$re_length, breaks=20)
+
+#For ALU
+hg38_re_full_ALU = hg38_re_tab_full[grepl(c("Alu"), hg38_re_tab_full$repFamily),]
+hist(hg38_re_full_ALU$re_length, breaks=20)
+hg38_re_full_ALU = hg38_re_full_ALU[hg38_re_full_ALU$re_length>280 ,]
+hg38_re_full_ALU = hg38_re_full_ALU[hg38_re_full_ALU$re_length<320 ,]
+hist(hg38_re_full_ALU$re_length, breaks=20)
+
+#For LTR
+hg38_re_full_LTR = hg38_re_tab_full[grepl(c("LTR"), hg38_re_tab_full$repFamily),]
+hist(hg38_re_full_LTR$re_length, breaks=20)
+hg38_re_full_LTR = hg38_re_full_LTR[hg38_re_full_LTR$re_length>560 ,]
+hg38_re_full_LTR = hg38_re_full_LTR[hg38_re_full_LTR$re_length<700 ,]
+hist(hg38_re_full_LTR$re_length, breaks=20)
+
+#For tRNA
+hg38_re_full_tRNA = hg38_re_tab_full[grepl(c("tRNA"), hg38_re_tab_full$repFamily),]
+hist(hg38_re_full_tRNA$re_length, breaks=20)
+hg38_re_full_tRNA = hg38_re_full_tRNA[hg38_re_full_tRNA$re_length>220 ,]
+hg38_re_full_tRNA = hg38_re_full_tRNA[hg38_re_full_tRNA$re_length<300 ,]
+hist(hg38_re_full_tRNA$re_length, breaks=20)
+
+#For DNA transposons
+hg38_re_full_DNA = hg38_re_tab_full[grepl("hAT|DNA", hg38_re_tab_full$repFamily),]
+hist(hg38_re_full_DNA$re_length, breaks=20)
+hg38_re_full_DNA = hg38_re_full_DNA[hg38_re_full_DNA$re_length>140 ,]
+hg38_re_full_DNA = hg38_re_full_DNA[hg38_re_full_DNA$re_length<400 ,]
+hist(hg38_re_full_DNA$re_length, breaks=20)
+
+#For scRNA
+hg38_re_full_scRNA = hg38_re_tab_full[grepl("scRNA", hg38_re_tab_full$repFamily),]
+hist(hg38_re_full_scRNA$re_length, breaks=20)
+hg38_re_full_scRNA = hg38_re_full_scRNA[hg38_re_full_scRNA$re_length>80 ,]
+hg38_re_full_scRNA = hg38_re_full_scRNA[hg38_re_full_scRNA$re_length<120 ,]
+hist(hg38_re_full_scRNA$re_length, breaks=20)
+
+#For 
+
+
+# The repName containing "-int" means "Internal region" of LTR 
+hg38_re_LTR = hg38_re_tab[grepl(c("-int",), hg38_re_tab$repName),]
+
+# Only use RE with length above 80% of HMM model 
+hist(hg38_re_int$re_length/hg38_re_int$mode_length)
+hg38_re_int_full = hg38_re_int[hg38_re_int$re_length/hg38_re_int$mode_length>0.8,]
+```
+
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

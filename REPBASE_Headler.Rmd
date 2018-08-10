@@ -1,0 +1,247 @@
+---
+title: "RepBase_handler"
+author: "Quanyuan He"
+date: "2018/8/9"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+### Get RE annotations from RepBase database
+The RepBase database was download on 2018/8/9
+The version : RepBase EMBL format (90.75 MB) 07-28-2018:
+For a description of the EMBL flat file format see ftp://ftp.ebi.ac.uk/pub/databases/embl/doc/usrman.txt.
+You need finstall R package "devtools" and "biofiles", which is require libgit2 in system
+Please install:
+     libgit2-dev   (package on e.g. Debian and Ubuntu)
+     libgit2-devel (package on e.g. Fedora, CentOS and RHEL)
+     libgit2       (Homebrew package on macOS) 
+     
+install_github("gschofl/biofiles")
+
+```{r Globel Information}
+
+REPBASE_URL="https://www.girinst.org/server/RepBase/index.php"
+REPBASE_DB_DIR = "/Users/quanyuanhe/OneDrive/MyProjects/repetative_seq/data_source/our_database/repbase/RepBase23.07.embl"
+```
+## Parse REPBASE embl files to a TSV file
+```{python engine.path="~/anaconda3/bin/python3.6"}
+# [Step 1]
+# Combine all *.ref files into a file named combine.embl
+# Commands: cat *.ref combine.embl
+#
+# [Step 2]
+# Parser EMBL
+__author__ = 'quanyuanhe'
+"""
+Author: Quanyuan He
+Version: 0.1
+Last update: 2018/8/10
+Notice: This script is designed to parse EMBL files from RepBase
+Extra testing is needed for files from other source
+"""
+import os, glob
+import re
+import codecs
+import subprocess
+
+class EMBL_PUB:
+    def __init__(self):
+        self.RN =""
+        self.RA =""
+        self.RT =""
+        self.RL =""
+
+    def toString(self):
+        return "RN:"+self.RN +"::"+\
+               "RA:"+self.RA +"::"+ \
+               "RT:" +self.RT +"::"+ \
+               "RL:" +self.RL
+
+class EMBL_CDS:
+    def __init__(self):
+        self.LOC=""   #162..3335
+        self.PRO=""
+        self.NOT=""
+        self.SEQ=""
+        self.String=""
+
+    def toString(self):
+        return "LOC:" + self.LOC + "::" + \
+               "PRO:" + self.PRO + "::" + \
+               "NOT:" + self.NOT + "::" + \
+               "SEQ:" + self.SEQ
+
+    def self_process(self):
+        if self.String!="":
+            ls = self.String.split("/")
+            for l in ls:
+                if re.search(r"(\d+..\d+)", l):
+                    k = re.search("(\d+..\d+)", l)
+                    self.LOC=k.group(1)
+                elif re.search(r'product="(.+)"',l):
+                    k = re.search(r'product="(.+)"',l)
+                    self.PRO = k.group(1)
+                elif re.search(r'note="(.+)"', l):
+                    k = re.search(r'note="(.+)"', l)
+                    self.NOT = k.group(1)
+                elif re.search(r'translation="(\w+)"', l):
+                    k = re.search(r'translation="(\w+)"', l)
+                    self.SEQ = k.group(1)
+
+class EMBL:
+    def __init__(self):
+        try:
+            self.ID=""
+            self.AC=""
+            self.XX=""
+            self.DT=""
+            self.DE =""
+            self.KW =""
+            self.OS = ""
+            self.OC = ""
+            self.CC = ""
+            self.Pubs=[]
+            self.CDSs=[]
+            self.SQ=""
+        except Exception as e:
+            print (e.message)
+    def toTSV(self):
+        pub_str = ""
+        for p in self.Pubs:
+            pub_str += p.toString()+"#"
+        pub_str = pub_str.strip('#')
+        cds_str = ""
+        for c in self.CDSs:
+            cds_str += c.toString()+"#"
+        cds_str= cds_str.strip('#')
+        return self.ID+"\t"\
+            +self.AC+"\t"\
+            +self.XX+"\t"\
+            +self.DT+"\t"\
+            +self.DE+"\t"\
+            +self.KW+"\t"\
+            +self.OS+"\t"\
+            +self.OC+"\t"\
+            +self.CC+"\t"\
+            +pub_str+"\t"\
+            +cds_str+"\t"\
+            +self.SQ
+
+def EMBLParser(file):
+    if not os.path.isfile(file):
+        print ("ERROR : File: "+file +" can't be found/opened!")
+        return
+    EMBL_ls = []
+    cur_embl = EMBL()
+    cur_embl_pub = None
+    cur_embl_cds = None
+    with codecs.open(file,'r','utf-8','ignore') as FILE:
+        for line in FILE:
+            line = line.strip()
+            if line.startswith("//"):
+                if cur_embl_cds and cur_embl_cds.LOC != "":
+                    cur_embl_cds.self_process()
+                    cur_embl.CDSs.append(cur_embl_cds)
+                if cur_embl_pub and cur_embl_pub.RN != "":
+                    cur_embl.Pubs.append(cur_embl_pub)
+                EMBL_ls.append(cur_embl)
+                # Reinitallization
+                cur_embl_pub = None
+                cur_embl_cds = None
+                cur_embl = EMBL()
+            if line.startswith("ID "):
+                cur_embl.ID +=re.sub(r"^ID\s+", "", line).split(" ")[0]
+            elif line.startswith("AC"):
+                cur_embl.AC +=re.sub(r"^AC\s+","", line)
+            elif line.startswith("DT"):
+                cur_embl.DT += re.sub(r"^DT\s+","", line)+";"
+            elif line.startswith("DE"):
+                cur_embl.DE += re.sub(r"^DE\s+", "", line) + ";"
+            elif line.startswith("KW"):
+                cur_embl.KW += re.sub(r"^KW\s+","", line)+";"
+            elif line.startswith("DT"):
+                cur_embl.DT += re.sub(r"^DT\s+","", line)+";"
+            elif line.startswith("OS"):
+                cur_embl.OS += re.sub(r"^OS\s+","", line)
+            elif line.startswith("OC"):
+                cur_embl.OC += re.sub(r"^OC\s+","", line)
+            elif line.startswith("CC"):
+                cur_embl.CC += re.sub(r"^CC\s+","", line)
+            elif line.startswith("R"):
+                if line.startswith("RN"):
+                    if cur_embl_pub != None:
+                        cur_embl.Pubs.append(cur_embl_pub)
+                    cur_embl_pub = EMBL_PUB()
+                    cur_embl_pub.RN += re.sub(r"^RN\s+", "", line) + ";"
+                elif line.startswith("RA"):
+                    cur_embl_pub.RA += re.sub(r"^RA\s+", "", line)
+                elif line.startswith("RT"):
+                    cur_embl_pub.RT += re.sub(r"^RT\s+", "", line)
+                elif line.startswith("RL"):
+                    cur_embl_pub.RL += re.sub(r"^RL\s+", "", line) + ";"
+            elif line.startswith("F"):
+                if line .startswith("FT   CDS"):
+                    if cur_embl_cds != None:
+                        cur_embl_cds.self_process()
+                        cur_embl.CDSs.append(cur_embl_cds)
+                    cur_embl_cds = EMBL_CDS()
+                    cur_embl_cds.String+=re.sub(r"^FT\s+CDS\s+", "", line)
+                elif line.startswith("FT"):
+                    cur_embl_cds.String += re.sub(r"^FT\s+", "", line)
+                cur_embl.DT += re.sub(r"^DT\s+","", line)+";"
+            elif re.search(r'(.+)\d+$', line):
+                k = re.search(r'(.+)\d+$', line)
+                seq= k.group(1)
+                seq= re.sub(r'\s+', "", seq)
+                cur_embl.SQ += seq
+    if cur_embl_cds and cur_embl_cds.LOC!="":
+        cur_embl_cds.self_process()
+    if cur_embl_pub and cur_embl_pub.RN!="":
+        cur_embl.Pubs.append(cur_embl_pub)
+    if cur_embl.ID!="":
+        EMBL_ls.append(cur_embl)
+    FILE.close()
+    return EMBL_ls
+
+def EMBL2TSV(embl, tsv):
+    EMBL_ls = EMBLParser(embl)
+    TSV =  open(tsv, 'w')
+    for i in EMBL_ls:
+        TSV.write(i.toTSV().strip()+"\n")
+    TSV.close()
+
+
+REPBASE_DB_DIR = "/Users/quanyuanhe/OneDrive/MyProjects/repetative_seq/data_source/our_database/repbase/RepBase23.07.embl"
+# Combine all *.ref files into a file named combine.embl
+# Commands: cat *.ref combine.embl
+embl = REPBASE_DB_DIR+"/combine.embl"
+#embl = REPBASE_DB_DIR+"/cbrrep.ref"
+tsv = REPBASE_DB_DIR+"/combine.tsv"
+
+EMBL2TSV(embl, tsv)
+```
+
+## Loading RE models into R
+```{r}
+tsv = paste(REPBASE_DB_DIR,"combine.tsv",sep="/")
+repbase_tab = read.csv(tsv, nrows=-1, header = FALSE, sep = "\t", comment.char="#", quote = "\"'", row.names = NULL)
+colnames(repbase_tab) = c('ID','AC','XX','DT','DE','KW','OS','CC','CC','PUB','CDS','SQ')
+
+```
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
