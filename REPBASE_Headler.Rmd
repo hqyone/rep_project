@@ -61,10 +61,10 @@ class EMBL_PUB:
         self.RL =""
 
     def toString(self):
-        return "RN:"+self.RN +"::"+\
-               "RA:"+self.RA +"::"+ \
-               "RT:" +self.RT +"::"+ \
-               "RL:" +self.RL
+        return "RN:"+self.RN \
+               +"RA:"+self.RA \
+               +"RT:" +self.RT \
+               +"RL:" +self.RL
 
 class EMBL_CDS:
     def __init__(self):
@@ -75,10 +75,10 @@ class EMBL_CDS:
         self.String=""
 
     def toString(self):
-        return "LOC:" + self.LOC + "::" + \
-               "PRO:" + self.PRO + "::" + \
-               "NOT:" + self.NOT + "::" + \
-               "SEQ:" + self.SEQ
+        return "LOC:" + self.LOC.strip() + "||"\
+               +"PRO:" + self.PRO.strip() + "||"\
+               +"NOT:" + self.NOT.strip() + "||"\
+               +"SEQ:" + self.SEQ.strip()
 
     def self_process(self):
         if self.String!="":
@@ -131,10 +131,10 @@ class EMBL:
             +self.KW+"\t"\
             +self.OS+"\t"\
             +self.OC+"\t"\
-            +self.CC+"\t"\
-            +pub_str+"\t"\
-            +cds_str+"\t"\
-            +self.SQ
+            +self.CC+"\t\""\
+            +pub_str+'\"\t\"'+cds_str+'\"\t\"'+self.SQ+'\"'
+    
+            # " is very important to seperate columns
 
 def EMBLParser(file):
     if not os.path.isfile(file):
@@ -146,9 +146,10 @@ def EMBLParser(file):
     cur_embl_cds = None
     with codecs.open(file,'r','utf-8','ignore') as FILE:
         for line in FILE:
-            line = line.strip()
+            if not line.startswith(" "):
+                line = line.strip()
             if line.startswith("//"):
-                if cur_embl_cds and cur_embl_cds.LOC != "":
+                if cur_embl_cds and cur_embl_cds.String != "":
                     cur_embl_cds.self_process()
                     cur_embl.CDSs.append(cur_embl_cds)
                 if cur_embl_pub and cur_embl_pub.RN != "":
@@ -183,9 +184,9 @@ def EMBLParser(file):
                     cur_embl_pub = EMBL_PUB()
                     cur_embl_pub.RN += re.sub(r"^RN\s+", "", line) + ";"
                 elif line.startswith("RA"):
-                    cur_embl_pub.RA += re.sub(r"^RA\s+", "", line)
+                    cur_embl_pub.RA += re.sub(r"^RA\s+", "", line).strip()
                 elif line.startswith("RT"):
-                    cur_embl_pub.RT += re.sub(r"^RT\s+", "", line)
+                    cur_embl_pub.RT += re.sub(r"^RT\s+", "", line).strip()
                 elif line.startswith("RL"):
                     cur_embl_pub.RL += re.sub(r"^RL\s+", "", line) + ";"
             elif line.startswith("F"):
@@ -194,17 +195,17 @@ def EMBLParser(file):
                         cur_embl_cds.self_process()
                         cur_embl.CDSs.append(cur_embl_cds)
                     cur_embl_cds = EMBL_CDS()
-                    cur_embl_cds.String+=re.sub(r"^FT\s+CDS\s+", "", line)
+                    cur_embl_cds.String+=re.sub(r"^FT\s+CDS\s+", "", line).strip()
                 elif line.startswith("FT"):
-                    cur_embl_cds.String += re.sub(r"^FT\s+", "", line)
-                cur_embl.DT += re.sub(r"^DT\s+","", line)+";"
-            elif re.search(r'(.+)\d+$', line):
-                k = re.search(r'(.+)\d+$', line)
+                    cur_embl_cds.String += re.sub(r"^FT\s+", "", line).strip()
+            elif re.search(r'(.+)\s+\d+$', line):
+                k = re.search(r'(.+)\s+\d+$', line)
                 seq= k.group(1)
                 seq= re.sub(r'\s+', "", seq)
-                cur_embl.SQ += seq
-    if cur_embl_cds and cur_embl_cds.LOC!="":
+                cur_embl.SQ += seq.strip()
+    if cur_embl_cds and cur_embl_cds.String!="":
         cur_embl_cds.self_process()
+        cur_embl.CDSs.append(cur_embl_cds)
     if cur_embl_pub and cur_embl_pub.RN!="":
         cur_embl.Pubs.append(cur_embl_pub)
     if cur_embl.ID!="":
@@ -214,11 +215,13 @@ def EMBLParser(file):
 
 def EMBL2TSV(embl, tsv):
     EMBL_ls = EMBLParser(embl)
+    ID_dic={};
     TSV =  open(tsv, 'w')
     for i in EMBL_ls:
-        TSV.write(i.toTSV().strip()+"\n")
+        if i.ID not in ID_dic:
+            TSV.write(i.toTSV().strip()+"\n")
+            ID_dic[i.ID]=i.ID
     TSV.close()
-
 
 REPBASE_DB_DIR = "/Users/quanyuanhe/OneDrive/MyProjects/repetative_seq/data_source/our_database/repbase/RepBase23.07.embl"
 # Combine all *.ref files into a file named combine.embl
@@ -233,9 +236,9 @@ EMBL2TSV(embl, tsv)
 ## Loading RE models into R
 ```{r}
 tsv = paste(REPBASE_DB_DIR,"combine.tsv",sep="/")
-repbase_tab = read.csv(tsv, nrows=-1, header = FALSE, sep = "\t", comment.char="#", quote = "\"'", row.names = NULL)
-colnames(repbase_tab) = c('ID','AC','XX','DT','DE','KW','OS','CC','CC','PUB','CDS','SQ')
 
+repbase_tab = read.table(tsv, header = FALSE, sep = "\t", comment.char="#", quote = "\"", row.names = NULL, fill=TRUE)
+colnames(repbase_tab) = c('ID','AC','XX','DT','DE','KW','OS','OC','CC','PUB','CDS','SQ')
 ```
 
 You can also embed plots, for example:

@@ -9,14 +9,56 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown
+# A introduction of Dfam databases 
+Dfam :[link](http://www.dfam.org/)
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+## Define global setting
+```{r}
+DFAM_URL= "http://www.dfam.org"
+DFAM_VERSION = "2.0"
+DFAM_DATABASE_DIR = "/Users/quanyuanhe/OneDrive/MyProjects/repetative_seq/data_source/our_database/Dfam"
+```
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+## Download pfam rnph_hit files and load it to workspace.
+```{r}
+library(HelpersMG)
+library(R.utils)
+library(reshape2)
+setwd(DFAM_DATABASE_DIR)
 
-```{r cars}
-summary(cars)
+# Function to Dfam for nrph.hits
+# TSV list of all non-redundant matches found in the
+# given assembly and that score above the GA threshold
+getDfamNrphHits = function (db_dir, version, genome){
+  gz_file_url = paste(genome,"_dfam.nrph.hits.gz",sep="")
+  print(gz_file_url)
+  file_url = paste(genome,"_dfam.nrph.hits",sep="")
+  print(file_url)
+  wget_url = paste("http://www.dfam.org/web_download/Release/Dfam_",as.character(version),"/",gz_file_url, sep="")
+  gz_file_path = paste(db_dir,gz_file_url,sep='/')
+  file_path = paste(db_dir,file_url,sep='/')
+  if (!file.exists(gz_file_path) && !file.exists(file_path)){
+    hit.gz <- wget(wget_url)
+  }
+  file_path = paste(db_dir,file_url,sep='/')
+  if (!file.exists(file_path)){
+    gunzip(gz_file_path)
+  }
+  result = read.csv(file_url, nrows=-1, header = FALSE, sep = "\t", comment.char="#", quote = "\"'", row.names = NULL)
+  colnames(result) = c('seq_name','model_acc','model_name','bit_score','e-value','-','hmm_start','humm_end','hmm_length',
+              'strand','align_start','align_end','envolope_start','envolope_end','seq_length','NA','description')
+  return (result)
+}
+
+hg38_nrph_hits = getDfamNrphHits(DFAM_DATABASE_DIR, DFAM_VERSION, "hg38")
+mm10_nrph_hits = getDfamNrphHits(DFAM_DATABASE_DIR,DFAM_VERSION,"mm10")
+
+```
+
+## Extract int sequences of REs
+```{python}
+import numpy
+print('hqyone')
 ```
 
 ## Including Plots

@@ -18,10 +18,11 @@ This is an R Markdown document. Markdown is a simple formatting syntax for autho
 When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
 
 ### Download table filese manually from UCSC genome browser table
-``````{r}
+```{r}
 UCSC_TAB_BROWSER = 'https://genome.ucsc.edu/cgi-bin/hgTables?hgsid=685867399_zetljl5Cf4OAAnBla4jSmBE8EHB1'
 UCSC_GB_WORKDIR = '/Users/quanyuanhe/OneDrive/MyProjects/repetative_seq/data_source/our_database/UCSC'
 ```
+
 ```{r, out.width = '60%', fig.cap="UCSC_GB_hg38_GENE_TAB"}
 UCSC_GB_hg38_GENE_TAB = paste(UCSC_GB_WORKDIR,'hg38_gene.tab',sep='/')
 #Loading data to dataframe
@@ -62,7 +63,7 @@ colnames(mm10_re_tab) = c('bin','swScore','milliDiv','milliDel','milliIns','geno
               'repName','repClass','repFamily','repStart','repEnd','repLeft','NA','id')
 ```
 ## Filter Repetitve Elements to get full-length REVs
-## using repNames which should  -int and the match ration is above 80%
+## using repNames which should  -int and the match ration is above 85%
 ```{r}
 
 # Get HMM model length
@@ -75,13 +76,26 @@ hg38_re_tab$mode_length = pos_temp+neg_temp
 # Get length of RE sequences
 hg38_re_tab$re_length = hg38_re_tab$genoEnd-hg38_re_tab$genoStart+1
 # Filter with percentage of sequences (80%)
-hg38_re_tab_full = hg38_re_tab[hg38_re_tab$re_length/hg38_re_tab$mode_length>0.8,]
+hg38_re_tab_full = hg38_re_tab[hg38_re_tab$re_length/hg38_re_tab$mode_length>0.85,]
+
+# Get information form the repbase CDS field
+getTranscript <- function(x, cds_index) {
+  x$GFF=rep("",nrow(x))
+  for(i in 1:nrow(x)) {
+    row <- x[i,]
+    #B[i,2] = paste(B[i,2],"xx",sep='=')
+    x[i,]$GFF=i
+    # do stuff with row
+  }
+}
 
 #For LINE1 and LINE2
 hg38_re_full_LINE = hg38_re_tab_full[grepl("L1|L2|CR1", hg38_re_tab_full$repFamily),]
 hist(hg38_re_full_LINE$re_length, breaks=20)
 hg38_re_full_LINE = hg38_re_full_LINE[hg38_re_full_LINE$re_length>5000,]
 hist(hg38_re_full_LINE$re_length, breaks=20)
+# Left join with repbase
+m1 <- merge(hg38_re_full_LINE, repbase_tab, by.x = "repName", by.y = "ID")
 
 #For ERVS
 hg38_re_full_ERV = hg38_re_tab_full[grepl(c("ERV"), hg38_re_tab_full$repFamily),]
@@ -107,16 +121,31 @@ hist(hg38_re_full_LTR$re_length, breaks=20)
 #For tRNA
 hg38_re_full_tRNA = hg38_re_tab_full[grepl(c("tRNA"), hg38_re_tab_full$repFamily),]
 hist(hg38_re_full_tRNA$re_length, breaks=20)
-hg38_re_full_tRNA = hg38_re_full_tRNA[hg38_re_full_tRNA$re_length>220 ,]
-hg38_re_full_tRNA = hg38_re_full_tRNA[hg38_re_full_tRNA$re_length<300 ,]
+hg38_re_full_tRNA = hg38_re_full_tRNA[hg38_re_full_tRNA$re_length>210 ,]
+hg38_re_full_tRNA = hg38_re_full_tRNA[hg38_re_full_tRNA$re_length<290 ,]
 hist(hg38_re_full_tRNA$re_length, breaks=20)
 
-#For DNA transposons
-hg38_re_full_DNA = hg38_re_tab_full[grepl("hAT|DNA", hg38_re_tab_full$repFamily),]
-hist(hg38_re_full_DNA$re_length, breaks=20)
-hg38_re_full_DNA = hg38_re_full_DNA[hg38_re_full_DNA$re_length>140 ,]
-hg38_re_full_DNA = hg38_re_full_DNA[hg38_re_full_DNA$re_length<400 ,]
-hist(hg38_re_full_DNA$re_length, breaks=20)
+#For hAT DNA transposons
+hg38_re_full_hAT_DNA = hg38_re_tab_full[grepl("hAT", hg38_re_tab_full$repFamily),]
+hg38_re_full_hAT_DNA = hg38_re_full_hAT_DNA[hg38_re_full_hAT_DNA$re_length<500 ,]
+hist(hg38_re_full_hAT_DNA$re_length, breaks=20)
+hg38_re_full_hAT_DNA = hg38_re_full_hAT_DNA[hg38_re_full_hAT_DNA$re_length>140 ,]
+hg38_re_full_hAT_DNA = hg38_re_full_hAT_DNA[hg38_re_full_hAT_DNA$re_length<380 ,]
+hist(hg38_re_full_hAT_DNA$re_length, breaks=20)
+
+#For DNA DNA transposons
+hg38_re_full_DNA_DNA = hg38_re_tab_full[grepl("DNA", hg38_re_tab_full$repFamily),]
+hist(hg38_re_full_DNA_DNA$re_length, breaks=20)
+hg38_re_full_DNA_DNA = hg38_re_full_DNA_DNA[hg38_re_full_DNA_DNA$re_length>140 ,]
+hg38_re_full_DNA_DNA = hg38_re_full_DNA_DNA[hg38_re_full_DNA_DNA$re_length<400 ,]
+hist(hg38_re_full_DNA_DNA$re_length, breaks=20)
+
+#For TcMar DNA transposons
+hg38_re_full_TcMar_DNA = hg38_re_tab_full[grepl("TcMar", hg38_re_tab_full$repFamily),]
+hist(hg38_re_full_TcMar_DNA$re_length, breaks=20)
+hg38_re_full_TcMar_DNA = hg38_re_full_TcMar_DNA[hg38_re_full_TcMar_DNA$re_length>2000 ,]
+hg38_re_full_TcMar_DNA = hg38_re_full_TcMar_DNA[hg38_re_full_TcMar_DNA$re_length<2700 ,]
+hist(hg38_re_full_TcMar_DNA$re_length, breaks=20)
 
 #For scRNA
 hg38_re_full_scRNA = hg38_re_tab_full[grepl("scRNA", hg38_re_tab_full$repFamily),]
