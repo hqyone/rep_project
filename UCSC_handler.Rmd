@@ -7,6 +7,7 @@ output: html_document
 
 ```{r setup, include=FALSE}
 library(knitr)
+library(stringr)
 knitr::opts_chunk$set(echo = TRUE)
 opts_chunk$set(fig.align = "center", echo=FALSE, out.width = '70%')
 ```
@@ -79,15 +80,21 @@ hg38_re_tab$re_length = hg38_re_tab$genoEnd-hg38_re_tab$genoStart+1
 hg38_re_tab_full = hg38_re_tab[hg38_re_tab$re_length/hg38_re_tab$mode_length>0.85,]
 
 # Get information form the repbase CDS field
-getTranscript <- function(x, cds_index) {
-  x$GFF=rep("",nrow(x))
+getSeqLen <- function(x) {
+  x$GFF=rep("xx",nrow(x))
   for(i in 1:nrow(x)) {
     row <- x[i,]
     #B[i,2] = paste(B[i,2],"xx",sep='=')
-    x[i,]$GFF=i
+    #x[i,]$XX = length(x[i,]$PUB)
+    x[i,]$XX=str_length(x[i,]$ID)
+    #x[i,]$XX=1
     # do stuff with row
   }
+  return(x)
 }
+B = getSeqLen(B)
+repbase_tab$XX = str_length(repbase_tab$SQ)
+
 
 #For LINE1 and LINE2
 hg38_re_full_LINE = hg38_re_tab_full[grepl("L1|L2|CR1", hg38_re_tab_full$repFamily),]
@@ -103,6 +110,8 @@ hist(hg38_re_full_ERV$re_length, breaks=20)
 hg38_re_full_ERV = hg38_re_full_ERV[hg38_re_full_ERV$re_length>5000 ,]
 hg38_re_full_ERV = hg38_re_full_ERV[hg38_re_full_ERV$re_length<9000 ,]
 hist(hg38_re_full_ERV$re_length, breaks=20)
+m2 <- merge(hg38_re_full_ERV, repbase_tab, by.x = "repName", by.y = "ID")
+hg38_repbase_tab_LTR = repbase_tab[grepl(c("HERV9NC"), repbase_tab$ID),]
 
 #For ALU
 hg38_re_full_ALU = hg38_re_tab_full[grepl(c("Alu"), hg38_re_tab_full$repFamily),]
