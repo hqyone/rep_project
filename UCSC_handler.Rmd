@@ -33,7 +33,6 @@ colnames(hg38_gene_tab) = c('name','chrom','strand','txStart','txEnd','cdsStart'
 # Show the setting of data downloading
 knitr::include_graphics('/Users/quanyuanhe/OneDrive/MyProjects/repetative_seq/data_source/our_database/UCSC/images/hg38_gene.png')
 knitr::include_graphics('/Users/quanyuanhe/OneDrive/MyProjects/repetative_seq/data_source/our_database/UCSC/images/hg38_gene_2.png')
-
 ```
 
 ```{r, out.width = '60%', fig.cap="UCSC_GB_hg38_RE_TAB"}
@@ -57,20 +56,20 @@ knitr::include_graphics('/Users/quanyuanhe/OneDrive/MyProjects/repetative_seq/da
 ```
 
 ```{r, out.width = '60%', fig.cap="UCSC_GB_mm10_RE_TAB"}
-UCSC_GB_mm10_RE_TAB = paste(UCSC_GB_WORKDIR,'mm10_re.tab',sep='/')
+UCSC_GB_mm10_RE_TAB = paste(UCSC_GB_WORKDIR,'mm10_rep.tab',sep='/')
 knitr::include_graphics('/Users/quanyuanhe/OneDrive/MyProjects/repetative_seq/data_source/our_database/UCSC/images/mm10_re.png')
 mm10_re_tab = read.csv(UCSC_GB_mm10_RE_TAB, nrows=-1, header = FALSE, sep = "\t", comment.char="#", quote = "\"'", row.names = NULL)
 colnames(mm10_re_tab) = c('bin','swScore','milliDiv','milliDel','milliIns','genoName','genoStart','genoEnd','genoLeft','strand',
-              'repName','repClass','repFamily','repStart','repEnd','repLeft','NA','id')
+              'repName','repClass','repFamily','repStart','repEnd','repLeft','id')
 ```
 ## Filter Repetitve Elements to get full-length REVs
 ## using repNames which should  -int and the match ration is above 85%
 ```{r}
-
+#g38_re_tab = mm10_re_tab
 # Get HMM model length
 pos_temp = hg38_re_tab$repEnd - hg38_re_tab$repLeft
 pos_temp[hg38_re_tab$strand=='-']=0
-neg_temp = hg38_re_tab$repEnd - hg38_re_tab$repStart
+neg_temp = hg38_re_tab$repEnd - hg38_re_tab$repLeft
 neg_temp[hg38_re_tab$strand=='+']=0
 hg38_re_tab$mode_length = pos_temp+neg_temp
 
@@ -78,6 +77,11 @@ hg38_re_tab$mode_length = pos_temp+neg_temp
 hg38_re_tab$re_length = hg38_re_tab$genoEnd-hg38_re_tab$genoStart+1
 # Filter with percentage of sequences (80%)
 hg38_re_tab_full = hg38_re_tab[hg38_re_tab$re_length/hg38_re_tab$mode_length>0.85,]
+# Filter RE of Satellites and Simple_repeats
+hg38_re_tab_full = hg38_re_tab_full[hg38_re_tab_full$repClass!='Satellite',]
+hg38_re_tab_full = hg38_re_tab_full[hg38_re_tab_full$repClass!='Simple_repeat',]
+# Get model_ID
+hg38_re_tab_full$model_id = paste(gsub("-int",'',hg38_re_tab_full$repName),hg38_re_tab_full$mode_length,sep="_")
 
 # Get information form the repbase CDS field
 getSeqLen <- function(x) {
@@ -92,8 +96,25 @@ getSeqLen <- function(x) {
   }
   return(x)
 }
-B = getSeqLen(B)
-repbase_tab$XX = str_length(repbase_tab$SQ)
+#B = getSeqLen(B)
+#repbase_tab$XX = str_length(repbase_tab$SQ)
+#For LINE1 and LINE2
+hg38_re_full_LINE1 = hg38_re_tab_full[grepl("L1", hg38_re_tab_full$repFamily),]
+hist(hg38_re_full_LINE1$re_length, breaks=20)
+hg38_re_full_LINE1 = hg38_re_full_LINE1[hg38_re_full_LINE1$re_length>5000,]
+hg38_re_full_LINE1 = hg38_re_full_LINE1[hg38_re_full_LINE1$re_length<8000,]
+hist(hg38_re_full_LINE1$re_length, breaks=20)
+hg38_re_full_LINE1_BED = hg38_re_full_LINE1[,c("genoName","genoStart","genoEnd","id","bin","strand","repName")]
+hg38_re_full_LINE1_BED[,"id"]=paste(1:length(hg38_re_full_LINE1_BED[,"id"]),hg38_re_full_LINE1_BED[,"repName"],sep="_")
+write.table(hg38_re_full_LINE1_BED, file="~/Desktop/mm10_line1.bed",sep="\t", row.names = FALSE, col.names = FALSE, quote = FALSE)
+
+hg38_re_full_LINE1 = hg38_re_tab_full[grepl("L2", hg38_re_tab_full$repFamily),]
+hist(hg38_re_full_LINE1$re_length, breaks=20)
+hg38_re_full_LINE1 = hg38_re_full_LINE1[hg38_re_full_LINE1$re_length>1800,]
+hist(hg38_re_full_LINE1$re_length, breaks=20)
+hg38_re_full_LINE1_BED = hg38_re_full_LINE1[,c("genoName","genoStart","genoEnd","id","bin","strand","repName")]
+hg38_re_full_LINE1_BED[,"id"]=paste(1:length(hg38_re_full_LINE1_BED[,"id"]),hg38_re_full_LINE1_BED[,"repName"],sep="_")
+write.table(hg38_re_full_LINE1_BED, file="~/Desktop/hg38_line2.bed",sep="\t", row.names = FALSE, col.names = FALSE, quote = FALSE)
 
 
 #For LINE1 and LINE2
@@ -102,7 +123,8 @@ hist(hg38_re_full_LINE$re_length, breaks=20)
 hg38_re_full_LINE = hg38_re_full_LINE[hg38_re_full_LINE$re_length>5000,]
 hist(hg38_re_full_LINE$re_length, breaks=20)
 # Left join with repbase
-m1 <- merge(hg38_re_full_LINE, repbase_tab, by.x = "repName", by.y = "ID")
+# This doesn't work because the model difinitions are different between UCSC and 
+m1 <- merge(hg38_re_full_LINE, repbase_tab, by.x = "model_id", by.y = "MOD")
 
 #For ERVS
 hg38_re_full_ERV = hg38_re_tab_full[grepl(c("ERV"), hg38_re_tab_full$repFamily),]
@@ -110,7 +132,7 @@ hist(hg38_re_full_ERV$re_length, breaks=20)
 hg38_re_full_ERV = hg38_re_full_ERV[hg38_re_full_ERV$re_length>5000 ,]
 hg38_re_full_ERV = hg38_re_full_ERV[hg38_re_full_ERV$re_length<9000 ,]
 hist(hg38_re_full_ERV$re_length, breaks=20)
-m2 <- merge(hg38_re_full_ERV, repbase_tab, by.x = "repName", by.y = "ID")
+m2 <- merge(hg38_re_full_ERV, repbase_tab, by.x = "model_id", by.y = "MOD")
 hg38_repbase_tab_LTR = repbase_tab[grepl(c("HERV9NC"), repbase_tab$ID),]
 
 #For ALU

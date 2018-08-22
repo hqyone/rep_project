@@ -54,6 +54,100 @@ hg38_nrph_hits = getDfamNrphHits(DFAM_DATABASE_DIR, DFAM_VERSION, "hg38")
 mm10_nrph_hits = getDfamNrphHits(DFAM_DATABASE_DIR,DFAM_VERSION,"mm10")
 
 ```
+```{r}
+
+# Filter re_hit with full-length model match
+hg38_nrph_hits = hg38_nrph_hits[(hg38_nrph_hits$humm_end-hg38_nrph_hits$hmm_start+1)/hg38_nrph_hits$hmm_length>0.85,]
+
+
+class_infor=hg38_re_tab[,c(11,12,13)]
+class_infor = unique.data.frame(class_infor)
+m1 <- merge(hg38_nrph_hits, class_infor, by.x = "model_name", by.y = "repName", all.x = TRUE)
+#LINE1
+indexes = which(grepl(c("LINE2"), m1$description))
+levels(m1$repClass)= c(levels(m1$repClass),'LINE')
+m1[indexes,]$repClass = "LINE"
+levels(m1$repFamily)= c(levels(m1$repFamily),'L1')
+m1[indexes,]$repFamily = "L2"
+
+#LINE1
+indexes = which(grepl(c("L1"), m1$description))
+levels(m1$repClass)= c(levels(m1$repClass),'LINE')
+m1[indexes,]$repClass = "LINE"
+levels(m1$repFamily)= c(levels(m1$repFamily),'L1')
+m1[indexes,]$repFamily = "L1"
+
+indexes = which(grepl(paste(c("satellite","Satellite"),collapse="|"), m1$description))
+levels(m1$repClass)= c(levels(m1$repClass),'satellite')
+m1[indexes,]$repClass = "satellite"
+levels(m1$repFamily)= c(levels(m1$repFamily),'satellite')
+m1[indexes,]$repFamily = "satellite"
+
+#DNA transposon
+
+
+indexes = which(grepl(paste(c('DNA transposon'),collapse="|"), m1$description))
+levels(m1$repClass)= c(levels(m1$repClass),'DNA')
+m1[indexes,]$repClass = "DNA"
+#levels(m1$repFamily)=c(levels(m1[indexes,]),as.character(unique(m1[indexes,]$model_name)))
+levels(m1$repFamily)= c(levels(m1$repFamily),'DNA')
+m1[indexes,]$repFamily = 'DNA'
+
+indexes = which(grepl(paste(c('Charlie'),collapse="|"), m1$description))
+levels(m1$repClass)= c(levels(m1$repClass),'DNA')
+m1[indexes,]$repClass = "DNA"
+levels(m1$repFamily)= c(levels(m1$repFamily),'Charlie')
+m1[indexes,]$repFamily = 'Charlie'
+
+#*_DNA
+indexes = which(grepl(paste(c("_DNA"),collapse="|"), m1$model_name))
+levels(m1$repClass)= c(levels(m1$repClass),'DNA')
+m1[indexes,]$repClass = "DNA"
+levels(m1$repFamily)= c(levels(m1$repFamily),'TcMar')
+m1[indexes,]$repFamily = "TcMar"
+
+m1[which(is.na(m1$repClass)),]$repClass='Unknown'
+levels(m1$repFamily)= c(levels(m1$repFamily),'Unknown')
+m1[which(is.na(m1$repFamily)),]$repFamily='Unknown'
+
+hg38_nrph_hits = m1
+hg38_nrph_hits$align_len = abs(hg38_nrph_hits$align_end - hg38_nrph_hits$align_start)
+m1 = NULL
+```
+
+```{r}
+hg38_re_full_LINE = hg38_nrph_hits[grepl("L1|L2|CR1", hg38_nrph_hits$repFamily),]
+hist(hg38_re_full_LINE$align_len, breaks=20)
+hg38_re_full_LINE = hg38_re_full_LINE[hg38_re_full_LINE$align_len>5000,]
+hist(hg38_re_full_LINE$align_len, breaks=20)
+# Left join with repbase
+# This doesn't work because the model difinitions are different between UCSC and 
+m1 <- merge(hg38_re_full_LINE, repbase_tab, by.x = "model_id", by.y = "MOD")
+```
+
+#ERVL
+indexes = which(grepl(paste(c("ERVL"),collapse="|"), m1$description))
+levels(m1$repClass)= c(levels(m1$repClass),'LTR')
+m1[indexes,]$repClass = "LTR"
+levels(m1$repFamily)= c(levels(m1$repFamily),'ERVL')
+m1[indexes,]$repFamily = "ERVL"
+
+#ERV1
+indexes = which(grepl(paste(c("ERV1"),collapse="|"), m1$description))
+levels(m1$repClass)= c(levels(m1$repClass),'LTR')
+m1[indexes,]$repClass = "LTR"
+levels(m1$repFamily)= c(levels(m1$repFamily),'ERV1')
+m1[indexes,]$repFamily = "ERV1"
+
+#ERVK
+indexes = which(grepl(paste(c("ERVK"),collapse="|"), m1$description))
+levels(m1$repClass)= c(levels(m1$repClass),'LTR')
+m1[indexes,]$repClass = "LTR"
+levels(m1$repFamily)= c(levels(m1$repFamily),'ERVK')
+m1[indexes,]$repFamily = "ERVK"
+```
+
+
 
 ## Extract int sequences of REs
 ```{python}

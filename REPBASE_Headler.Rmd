@@ -239,6 +239,8 @@ tsv = paste(REPBASE_DB_DIR,"combine.tsv",sep="/")
 
 repbase_tab = read.table(tsv, header = FALSE, sep = "\t", comment.char="#", quote = "\"", row.names = NULL, fill=TRUE)
 colnames(repbase_tab) = c('ID','AC','XX','DT','DE','KW','OS','OC','CC','PUB','CDS','SQ')
+repbase_tab$LEN=str_length(repbase_tab$SQ)
+repbase_tab$MOD = paste(gsub("-int",'',repbase_tab$ID),repbase_tab$LEN,sep="_")
 ```
 
 You can also embed plots, for example:
