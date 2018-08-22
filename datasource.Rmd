@@ -1,0 +1,32 @@
+---
+title: "DataSources"
+author: "Quanyuan He"
+date: "2018/8/21"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## ENCODE Database
+ENCODE Database is a major data sources of the project.
+There are two steps to access ENCODE project:
+1. Generate manifest files using restful API of ENCODE
+2. Generate bash files to download target files
+
+### Step 1: Make menifest file
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

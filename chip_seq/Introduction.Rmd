@@ -1,0 +1,94 @@
+<center> <h1>The function and regulation of repetitive elements in cancer cells</h1> </center>
+<center> <h4>Quanyuan He Ph.D.</h4> </center>
+<center> <h4>2018/8/19</h4> </center>
+---
+title: "The function and regulation of repetitive elements in cancer cells"</center>
+author: "Quanyuan He Ph.D."
+email: "hqyone@hunnu.edu.cn"
+department: "Medical School of Hunan Normal University"
+date: "2018/8/19"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Project Introduction
+This project is aim to illustrate a global view of repetitive elements (RE) regulation in Human Cell Lines
+
+## Background
+### What are Repetitive Elements
+1. Tandem Repeats 
+  + 1.1 Satellite 
+    + major: Centromeres and heterochromatin (>200bp)
+    + minor: Centromeres and heterochromatin (>60bp)
+    + mini: (10~60 bp)
+    + micro (1-6~8bp): Telomeres (TTAGGGTTAGGGTTAGGG)
+2. Interspersed REs
+  + 2.1 LTR REs
+    + ERVs
+  + 2.1 NO-LTR REs
+    + LINEs
+    + SINEs
+      + Alu
+    + SVAs
+  + 2.3 DNA transposons
+
+### Functions
+Both Tandem and Interspersed REs can be transcripted in normal and abrrent conditions.
+Some transponsons can encode proteins (gag, env, pol) that are usually essential for transposition.
+REs can <span style="color:red">cis-transregulate transcription </span> of adjacent gens using their transcriptional conponents (promoters, enhancer, exons, terminator or splice junction) or epigentic statues.
+REs can also tran-regulate gene expression using siRNA like mechanisms（translational inhibition, Alternative splicing,  RNA stability regulation).
+Natural mutagensis of genomes by REs (Iskow, R.C. Cell 141, 1253–1261 (2010); Beck,C.R Cell 141, 1159–1170 (2010); Huang,C.R.etal. Cell 141, 1171–1182 (2010))
+Evolution Inducing the born of new genes e.g. formation of chimeric repeat-genic transcription by insertion (Karimi et al., 2011)
+
+#### "Bad" functions:
+1. Retrotransposition of REs induce genomic instability, disrupt regulatory elements and case mutations.
+2. Upregualtion of satellite and LINE repeats in human cancer were reported (Ting et al., 2011; Zhu et al., 2011). However the role and mechanisms of REs in Cancer is not known.
+
+#### "Good" functions:
+1. Protecting genomes by forming heterochromatins and specific chromatin structures such as centromere and telomere and Allele-specific control of the inactive X chromosome (Chow et al., 2010)
+2. REs are upregulated during the reprogramming of either mES, human CD34+ and human primary hepatocytes. (doi:10.1101/gr.172809.114 Genome Res.2014.)
+3. ERVL is essential for embryo totipotency and development. (Macfarlan et al., 2011, 2012,  Vedran Franke, et.al. Genome Res. 2017 Aug; 27(8): 1384–1394.)
+3. Placenta development (Nature, 2000; PNAS, 2009).
+4. HERKs induce viral restriction pathway (inhibit virus) in early embryonic cells by promote IFITM1 with Rec proteins (Nature, 2015) 
+5. Alters the genetic landscape of human brain, REs mobilize to protein-coding genes differentially expressed and active in the brain  (Coufal, et.al, Nature 2009; J. Kenneth Baillie et.al, Nature 2011, Open Biol. 2018 doi: 10.1098/rsob.180074.) 
+6. REs may be involved in chromatin 3D struction formation.
+
+### Regulation
+The researches on RE regulation majorly focus on repressive mechanisms.
+
+1. H3K9me3/SUV39h/G9a/HP1 and related pathways regulate Intact retrotransponsons and silences LINE in mES cell. http://dx.doi.org/10.1016/j.molcel.2014.05.029
+2. ATRX/DAXX/H3.3 pathway requred for endogenous RE silencing in ESc cell (Elsässer SJ, 2015, Nature;  Quanyuan He, 2015, Cell Stem Cell)
+3. DNA methylation (CpG) is important for RE silencing in differentaliated cells. 
+4. Novel DNA methylation on N6-adenine also silence LINE1 in mES cell. (ALKBH1:DNA demethylase, DAMT-1: DNA methyltransferase)
+5. Murine leukemia virus (MLV) and IAP retroelements as targets of Polycomb complexes in ES cell. (Genes Dev, 2010)
+
+### Remained Questions
+1. Even though genome-wide maps for distinct chromatin con-figurations at several repeat classes (Ernst et al., 2011; Mikkel- sen et al., 2007) and transcriptome maps for retrotransposons (Faulkner et al., 2009) were published, a full understanding of the repeat-associated heterochromatin in the mouse/human genome is lacking. 
+2. There are a assumption that all members of certain family should have behavier to response to outside stimulation. Is this true? (Nucleic Acids Res. 2010 Jul; 38(12): 3909–3922.)
+3. What are the functions of REs in somatic tissues and cells other than early embryos and ES cells ?
+4. What is the role of the activation/upregulation of REs in cancer cells in cancer development?
+5. What is the significance of REs inducing mutations (CNV) in cancer development. 
+6. The biological impact of somatic retrotransposition is unknown. (Mobile DNA 2018 9:22; https://doi.org/10.1186/s13100-018-0128-1)
+ 
+### References
+1. Aydan Bulut-Karslioglu et, al (2014) Suv39h-Dependent H3K9me3 Marks Intact Retrotransposons and Silences LINE Elements in Mouse Embryonic Stem Cells. Molecualr Cell (http://dx.doi.org/10.1016/j.molcel.2014.05.029)
+2. Zhu, Q., Pao, G.M., Huynh, A.M., Suh, H., Tonnu, N., Nederlof, P.M., Gage, F.H., and Verma, I.M. (2011). BRCA1 tumour suppression occurs via hetero- chromatin-mediated silencing. Nature 477, 179–184.
+3. Ting et al., 2011, Aberrant overexpression of satellite repeats in pancreatic and other epithelial cancers. Science 331, 593–596.
+4. Ernst, J., et al. (2011). Mapping and analysis of chromatin state dynamics in nine human cell types. Nature 473, 43–49.
+5. Faulkner, et al. (2009). The regulated retrotransposon transcriptome of mammalian cells. Nat. Genet. 41, 563–571.
+6. Elsässer SJ, Nature. 2015 Jun 11;522(7555):240-244. doi: 10.1038/nature14345. Epub 2015 May 4.
+7. Mi, S. et al. Syncytin is a captive retroviral envelope protein involved in human placental morphogenesis. Nature 403, 785–789 (2000). 
+8. Dupressoir, A. et al. Syncytin-A knockout mice demonstrate the critical role in placentation of a fusogenic, endogenous retrovirus-derived, envelope gene. Proc. Natl Acad. Sci. USA 106, 12127–12132 (2009). 
+9. Intrinsic retroviral reactivation in human preimplantation embryos and pluripotent cells  (2015 Nature)
+10. Somatic retrotransposition alters the genetic landscape of the human brain, 2011, Nature
+11. Coufal,N.G.etal.L1retrotranspositioninhumanneuralprogenitorcells.Nature 460, 1127–1131 (2009).
+11. Polycomb complexes act redundantly to repress genomic repeats and genes. Genes Dev. 2010 Feb 1;24(3):265-76. doi: 10.1101/gad.544410.
+12. Genome Res. 2017 Aug;27(8):1384-1394. doi: 10.1101/gr.216150.116. Epub 2017 May 18.
+13. Helen M et.al Dynamic control of endogenous retroviruses during development. Virology, 2010
+14. Ewing,A.D.&Kazazian,H.H.Jr.High-throughputsequencingrevealsextensive variation in human-specific L1 content in individual human genomes. Genome Res. 20, 1262–1270 (2010).
+15. Iskow, R. C. et al. Natural mutagenesis of human genomes by endogenous retrotransposons. Cell 141, 1253–1261 (2010).
+16. Beck,C.R.etal.LINE-1retrotranspositionactivityinhumangenomes.Cell141, 1159–1170 (2010).
+17. Huang,C.R.etal.Mobileinterspersedrepeatsaremajorstructuralvariantsinthe human genome. Cell 141, 1171–1182 (2010).
