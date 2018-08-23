@@ -1,0 +1,731 @@
+---
+title: "DataSources"
+author: "Quanyuan He"
+date: "2018/8/21"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## ENCODE Database
+ENCODE Database is a major data sources of the project.
+There are two steps to access ENCODE project:
+1. Generate a manifest file using the Restful APIs of ENCODE
+2. Generate bash files to download target files
+
+### Step 1: Make a manifest file
+The good thing of the script is that it can detect control for each sample automatically,
+which is really important for following analysis
+Notice: As the script will query the ENCODE database recrusively, it will take long time to make a big manifest file
+```{python}
+import requests, json
+import os
+
+# Force return from the server in JSON format
+HEADERS = {'accept': 'application/json'}
+
+class ENCODE_DataExplorer:
+    # Print the object
+    def getObjectJson(self, obj):
+        return json.dumps(obj, indent=4, separators=(',', ': '))
+
+    def getExpList(self,URL):
+        # GET the object
+        response = requests.get(URL, headers=HEADERS)
+
+        # Extract the JSON response as a python dict
+        response_json_dict = response.json()
+        return response_json_dict
+
+    def getExpObj(self, exp_id):
+        HEADERS = {'accept': 'application/json'}
+        URL= "https://www.encodeproject.org/experiments/"+exp_id+"/?frame=object"
+        response = requests.get(URL, headers=HEADERS)
+
+        # Extract the JSON response as a python dict
+        response_json_dict = response.json()
+        return response_json_dict
+
+    def getSampleObj(self, smp_id):
+        HEADERS = {'accept': 'application/json'}
+        URL= "https://www.encodeproject.org/biosample/"+smp_id+"/?frame=object"
+        response = requests.get(URL, headers=HEADERS)
+
+        # Extract the JSON response as a python dict
+        response_json_dict = response.json()
+        return response_json_dict
+
+    def getLibraryObj(self, lib_id):
+        HEADERS = {'accept': 'application/json'}
+        URL= "https://www.encodeproject.org/library/"+lib_id+"/?frame=object"
+        response = requests.get(URL, headers=HEADERS)
+
+        # Extract the JSON response as a python dict
+        response_json_dict = response.json()
+        return response_json_dict
+
+    def getFileObj(self, file_id):
+        HEADERS = {'accept': 'application/json'}
+        URL= "https://www.encodeproject.org/file/"+file_id+"/?frame=object"
+        response = requests.get(URL, headers=HEADERS)
+        response_json_dict = None
+        # Extract the JSON response as a python dict
+        if response:
+            response_json_dict = response.json()
+        return response_json_dict
+
+    def getFilesStr(self, file_ls):
+        c_file_ls = []
+        for cf in file_ls:
+            c_file_ls.append(cf.split('/')[2])
+        control_files = ",".join(c_file_ls)
+        return control_files
+
+    def getPeplineAbb(self, pepline):
+        result = "unknown"
+        if (pepline.index('tophat')>=0 and pepline.index("bowtie2")>=0):
+            result = "Tophat_Bowtie2"
+        return result
+
+
+    def getBamFiles(self, manifest_file, URL, genome='hg19', output_type="unfiltered alignments", anno='NA'):
+        #control_file = "./HepG2_eCLIP_source_list.txt"
+        FILE = open(manifest_file,'w')
+        exp_obj_ls = self.getExpList(URL)
+        CONTROL_EXP_BAM_DIC = {}
+        files_dic = {}
+        title = "files\tbam_files\tENCODE\texp_id\tassay\tfiles_size\trun_type\ttarget\tbiosample\torgam\tdescription\tderived_files\tgenome\tgenome_anno\n"
+        FILE.write(title)
+        for exp_obj in exp_obj_ls[u'@graph']:
+            exp_id = exp_obj[u'@id'].split('/')[2]
+            print (exp_id)
+            exp = self.getExpObj(exp_id)
+            control_exp_id = ""
+            if 'possible_controls' in exp and len(exp['possible_controls']) > 0:
+                control_exp_id = exp['possible_controls'][0].split('/')[2]
+            biosample = exp['biosample_summary']
+            description = exp['description']
+            target = ""
+            if 'target' in exp:
+                target =exp['target'].split('/')[2]
+            assay = exp['assay_term_name']
+            exp_id = exp['accession']
+            orgam = ",".join(exp['organ_slims'])
+            control_file = ""
+            max_size = 0
+            if control_exp_id !="" and control_exp_id not in CONTROL_EXP_BAM_DIC:
+                control_exp = self.getExpObj(control_exp_id)
+                for origianl_file in control_exp[u'files']:
+                    f = origianl_file.split('/')[2]
+                    if f not in files_dic:
+                        #print "origianl_file\t"+f
+                        file_obj = self.getFileObj(f)
+                        read_length = 0
+                        data_set_id = file_obj[u'dataset'].split('/')[2]
+                        if file_obj and 'file_type' in file_obj and file_obj['file_type'] == "bam" and file_obj['status']=='released' and file_obj['output_type'] == output_type:
+                            assembly = file_obj['assembly']
+                            biological_indexs =  file_obj['biological_replicates']
+                            size = int(file_obj['file_size'])
+                            if assembly == genome:
+                                if 'mapped_read_length' in file_obj:
+                                    read_length= int(file_obj['mapped_read_length'])
+                                if size>max_size:
+                                    control_file = f
+                                    max_size = size
+
+
+            if assay == 'RNA-seq' or control_file!="":
+                read_length = 0
+                for origianl_file in exp[u'files']:
+                    f = origianl_file.split('/')[2]
+                    if f not in files_dic:
+                        #print "origianl_file\t"+f
+                        file_obj = self.getFileObj(f)
+                        files = f
+
+                        biological_indexs =  file_obj['biological_replicates']
+                        genome_anno = "NA"
+                        if 'genome_annotation' in file_obj:
+                            genome_anno =  file_obj['genome_annotation']
+                        c_files = control_file
+                        run_type = ""
+                        derived_files = []
+                        if file_obj and 'file_type' in file_obj and file_obj['file_type'] == "bam":
+
+                            if file_obj['status']=='released' and file_obj['output_type'] == output_type:
+                                assembly = file_obj['assembly']
+                                if assembly == genome :
+                                    if 'file_size' in file_obj:
+                                        files_size = str(file_obj['file_size'])
+                                    if 'mapped_read_length' in file_obj:
+                                        read_length= int(file_obj['mapped_read_length'])
+                                    if 'derived_from' in file_obj:
+                                        for fastq_id in file_obj['derived_from']:
+                                            if fastq_id in exp[u'files']:
+                                                fqid = fastq_id.split("/")[2]
+                                                derived_files.append(fqid)
+                                                fastq_obj = self.getFileObj(fqid)
+                                                if fastq_obj and 'read_length' in fastq_obj and read_length==0:
+                                                    read_length= fastq_obj['read_length']
+                                        if len(derived_files)>1:
+                                            run_type = "PE\t"+str(read_length)
+                                        else:
+                                            run_type = "SE\t"+str(read_length)
+                                        a = files +"\t"+c_files+"\tENCODE\t"+exp_id+"\t"+assay+"\t"+files_size+"\t"\
+                                        +run_type+"\t"+target+"\t"+biosample+"\t"+orgam+"\t"+description+"\t"\
+                                        +",".join(derived_files)+"\t"+genome+"\t"+genome_anno
+                                        FILE.write(a.encode('utf-8')+"\n")
+                                        print (a)
+                        files_dic[f] =f
+        FILE.close()
+        print ("The data sources extraction is done!")
+
+    def getBWFiles(self, control_file, URL, genome='GRCh38', output_type="unfiltered alignments", anno='V24', pepline=""， max_file_num=-1):
+        #control_file = "./HepG2_eCLIP_source_list.txt"
+        existed_ids = []
+        if control_file!="" and os.path.isfile(control_file):
+            OLD_FILE = open(control_file, "r")
+            for line in OLD_FILE:
+                contents = line.split("\t")
+                if len(contents)>3:
+                    exp_id = contents[3]
+                    if exp_id not in existed_ids:
+                        existed_ids.append(exp_id)
+            OLD_FILE.close()
+
+        FILE = open(control_file,'a')
+        exp_obj_ls = self.getExpList(URL)[u'@graph']
+        CONTROL_EXP_BAM_DIC = {}
+        files_dic = {}
+        begin=False
+        exp_obj_ls.sort(key=lambda x: x[u'@id'], reverse=True)
+        title = "files\tbw_file\tENCODE\texp_id\tassay\tfiles_size\trun_type\ttarget\tbiosample\torgam\tdescription\tderived_files\tc_bam_file\tgenome\tgenome_anno\tnotes\n"
+        FILE.write(title)
+        file_num = 0;
+        for exp_obj in exp_obj_ls:
+            exp_id = exp_obj[u'@id'].split('/')[2]
+            print (exp_id)
+            if exp_id in existed_ids:
+                continue
+            exp = self.getExpObj(exp_id)
+            control_exp_id = ""
+            if 'possible_controls' in exp and len(exp['possible_controls']) > 0:
+                control_exp_id = exp['possible_controls'][0].split('/')[2]
+            biosample = exp['biosample_summary']
+            description = exp['description']
+            target = ""
+            if 'target' in exp:
+                target =exp['target'].split('/')[2]
+            assay = exp['assay_term_name']
+            exp_id = exp['accession']
+            orgam = ",".join(exp['organ_slims'])
+            c_bam_file_dic = {}
+            control_file_dic = {}
+            control_file_size_dic= {}
+            max_size = 0
+            if control_exp_id !="" and control_exp_id not in CONTROL_EXP_BAM_DIC:
+                control_exp = self.getExpObj(control_exp_id)
+
+                for origianl_file in control_exp[u'files']:
+                    f = origianl_file.split('/')[2]
+                    if f not in files_dic:
+                        #print "origianl_file\t"+f
+                        file_obj = self.getFileObj(f)
+
+                        if bool(file_obj) and "dataset" in file_obj:
+                            if pepline!= "" and ("notes" not in file_obj or pepline not in file_obj["notes"]):
+                                """
+                                if "notes" in file_obj and file_obj['file_type'] == "bigWig":
+                                    print file_obj["notes"]
+                                """
+                                continue
+
+                            read_length = 0
+                            data_set_id = file_obj[u'dataset'].split('/')[2]
+                            if file_obj and 'file_type' in file_obj and file_obj['file_type'] == "bigWig" and file_obj['status']=='released':
+                                output_type = file_obj['output_type']
+                                c_bam_file=""
+                                if 'derived_from' in file_obj and len(file_obj['derived_from'])>0:
+                                    c_bam_file = file_obj['derived_from'][0].split('/')[2]
+                                assembly = file_obj['assembly']
+                                biological_indexs =  file_obj['biological_replicates']
+                                size = int(file_obj['file_size'])
+                                if assembly == genome:
+                                    if 'mapped_read_length' in file_obj:
+                                        read_length= int(file_obj['mapped_read_length'])
+                                    #Select the largest file as control
+                                    #if output_type not in control_file_size_dic or size > control_file_size_dic[output_type]:
+
+                                    #Only choice the first one control
+                                    if output_type not in control_file_size_dic or biological_indexs[0]==1:
+                                        control_file_dic[output_type] = f
+                                        control_file_size_dic[output_type] = size
+                                        c_bam_file_dic[output_type] = c_bam_file
+
+                                        max_size = size
+
+
+            if assay == 'RNA-seq' or bool(control_file_dic):
+                read_length = 0
+                for origianl_file in exp[u'files']:
+                    f = origianl_file.split('/')[2]
+                    if f not in files_dic:
+                        #print "origianl_file\t"+f
+                        file_obj = self.getFileObj(f)
+                        if not file_obj:
+                            continue
+                        files = f
+                        if "biological_replicates" in file_obj:
+                            biological_indexs =  file_obj['biological_replicates']
+                        genome_anno = "NA"
+                        if 'genome_annotation' in file_obj:
+                            genome_anno =  file_obj['genome_annotation']
+                        if pepline!= "" and ("notes" not in file_obj or pepline not in file_obj["notes"]):
+                            continue
+                        #c_files = control_file
+                        run_type = ""
+                        derived_files = []
+                        if file_obj and 'file_type' in file_obj and file_obj['file_type'] == "bigWig" and genome_anno == anno:
+                            if file_obj['status']=='released' :
+                                notes = ""
+                                if "notes" in file_obj:
+                                    notes = file_obj['notes']
+                                output_type = file_obj['output_type']
+                                c_file = ""
+                                c_bam_file = ""
+                                if output_type in control_file_dic:
+                                    c_file = control_file_dic[output_type]
+                                    c_bam_file = c_bam_file_dic[output_type]
+                                assembly = file_obj['assembly']
+                                if assembly == genome:
+                                    if 'file_size' in file_obj:
+                                        files_size = str(file_obj['file_size'])
+                                    if 'mapped_read_length' in file_obj:
+                                        read_length= int(file_obj['mapped_read_length'])
+                                    if 'derived_from' in file_obj:
+                                        for bam_id in file_obj['derived_from']:
+                                            if bam_id in exp[u'files']:
+                                                bamid = bam_id.split("/")[2]
+                                                derived_files.append(bamid)
+                                                run_type =  output_type+"\t100"
+                                                """
+                                                bam_obj = getFileObj(bamid)
+                                                if len(derived_files)>1:
+                                                    run_type = "PE\t"+str(read_length)
+                                                else:
+                                                    run_type = "SE\t"+str(read_length)
+                                                """
+                                            a = files +"\t"+c_file+"\tENCODE\t"+exp_id+"\t"\
+                                            +assay+"\t"+files_size+"\t"+run_type+"\t"+target+"\t"\
+                                            +biosample+"\t"+orgam+"\t"+description+"\t"\
+                                            +",".join(derived_files)+"\t"+c_bam_file+"\t"+genome+"\t"+genome_anno+"\t"+notes
+                                            FILE.write(a.encode('utf-8')+"\n")
+                                            file_num+=1
+                        files_dic[f] =f
+                        if (max_file_num>0 && file_num>=max_file_num){
+                            break;
+                        }
+        FILE.close()
+        print ("The data sources extraction is done!")
+
+    def getFastqFiles(self, control_file, URL, withcontrol=True):
+        #control_file = "./HepG2_eCLIP_source_list.txt"
+        FILE = open(control_file,'w')
+        exp_obj_ls = self.getExpList(URL)
+        files_dic = {}
+        title = "files\tcontrol_files\tENCODE\texp_id\tassay\tfiles_size\trun_type\ttarget\tbiosample\torgam\tdescription\n"
+        FILE.write(title)
+        for exp_obj in exp_obj_ls[u'@graph']:
+            exp_id =  exp_obj[u'@id'].split('/')[2]
+            exp = self.getExpObj(exp_id)
+            biosample = exp['biosample_summary']
+            description = exp['description']
+            target =""
+            if 'target' in exp:
+                target =exp['target'].split('/')[2]
+            assay = exp['assay_term_name']
+            exp_id = exp['accession']
+            orgam = ",".join(exp['organ_slims'])
+            for origianl_file in exp[u'original_files']:
+                f = origianl_file.split('/')[2]
+                if f not in files_dic:
+                    #print "origianl_file\t"+f
+                    file_obj = self.getFileObj(f)
+                    files = ""
+                    control_files = ""
+                    run_type = ""
+                    if file_obj and 'file_type' in file_obj and file_obj['file_type'] == "fastq":
+                        files_size = str(file_obj['file_size'])
+                        if 'controlled_by' in file_obj:
+                            control_files = self. getFilesStr(file_obj['controlled_by'])
+                        read_length= file_obj['read_length']
+                        if 'run_type' in file_obj and file_obj['run_type'] != "single-ended":
+                            paired_file = file_obj['paired_with'].split('/')[2]
+                            paried_end = int(file_obj['paired_end'])
+                            run_type = "PE\t"+str(read_length)
+                            if paried_end == 1:
+                                files = f +";"+paired_file
+                                paired_file_obj = self.getFileObj(paired_file)
+                                if 'controlled_by' in paired_file_obj:
+                                    control_files=control_files+";"+ self.getFilesStr(paired_file_obj['controlled_by'])
+                                try:
+                                    a = files+"\t"+control_files+"\tENCODE\t"+exp_id+"\t"+assay+"\t"+files_size+"\t"\
+                                    +run_type+"\t"+target+"\t"+biosample.encode('utf-8')+"\t"+orgam+"\t"+description
+                                    a = a.encode('utf-8')
+                                    FILE.write(a+"\n")
+                                    print (a)
+                                except:
+                                    print (a)
+                            #print file_obj  #PE
+                        else:
+                            run_type = "SE\t"+str(read_length)
+                            files = f
+                            control_files = control_files
+                            a = files +"\t"+control_files+"\tENCODE\t"+exp_id+"\t"+assay+"\t"+files_size+"\t"\
+                            +run_type+"\t"+target+"\t"+biosample.encode('utf-8')+"\t"+orgam+"\t"+description
+                            a = a.encode('utf-8')
+                            FILE.write(a+"\n")
+                            print (a)
+
+        FILE.close()
+    print ("The data sources extraction is done!")
+
+human_RNA_Seq_URL = "https://www.encodeproject.org/search/?type=Experiment&status=released&assay_slims=Transcription&biosample_type=immortalized+cell+line&assay_title=polyA+RNA-seq&assembly=GRCh38&assembly=hg19&biosample_type=tissue&biosample_type=primary+cell&biosample_type=in+vitro+differentiated+cells&biosample_type=stem+cell&limit=all"
+mouse_RNA_Seq_URL = "https://www.encodeproject.org/search/?type=Experiment&status=released&assay_slims=Transcription&replicates.library.biosample.donor.organism.scientific_name=Mus+musculus&assay_title=polyA+RNA-seq&biosample_type=stem+cell&limit=all&biosample_type=immortalized+cell+line&biosample_type=primary+cell&biosample_type=tissue&biosample_type=in+vitro+differentiated+cells&limit=all"
+K562_CHIP_URL = "https://www.encodeproject.org/search/?type=Experiment&status=released&biosample_type=immortalized+cell+line&biosample_term_name=K562&assay_title=ChIP-seq&limit=all"
+K562_shRNA_RNA_URL = "https://www.encodeproject.org/search/?type=Experiment&status=released&biosample_type=immortalized+cell+line&biosample_term_name=K562&assay_title=shRNA+RNA-seq&limit=all"
+HepG2_shRNA_RNA_URL = "https://www.encodeproject.org/search/?type=Experiment&biosample_term_name=HepG2&assay_title=shRNA+RNA-seq&limit=all"
+
+a = ENCODE_DataExplorer()
+
+#a.getFastqFiles("./human_RNASeq_source_list.txt", human_RNA_Seq_URL)
+#a.getBamFiles("./K562_CHIP_hu38_ali_bam_source_list.txt", K562_CHIP_URL, genome='GRCh38', output_type="alignments", anno='V24')
+a.getBWFiles("", HepG2_shRNA_RNA_URL, genome='GRCh38', output_type="unfiltered alignments", anno='V24', pepline="tophat")
+```
+
+### Step 2: Create bash files to download data files
+The folder for downloading includes several folders and log files
+/wd_dir
+  /repo
+    /data         # A folder containing all data files
+    /cmd          # A folder has all bash files
+    /config.log   # A file recording IDs which have been downloaded
+
+```{python}
+import io
+import os, errno, glob
+import commands
+from os import listdir
+from os.path import isfile, join
+import re
+
+class Downloader:
+    def __init__(self, root_dir, ftype = "fastq.gz"):
+        try:
+            self.root_dir = root_dir
+            self.repository_dir = self.root_dir+"/repos"
+            self.data_dir = self.repository_dir+"/data"
+            self.cmd_dir = self.repository_dir+"/cmd"
+            self.config_file = self.repository_dir+"/config.log"
+            self.ftype = ftype
+            self.exist_ids = []
+            self.read_log()
+            self.thread_num = 8  # The number of bash files to download simutanously
+            os.makedirs(self.data_dir)
+            os.makedirs(self.cmd_dir)
+        except Exception as e:
+            print(e.message)
+
+    def GetDoneList(self):
+        if os.path.isfile(self.config_file):
+            LOG = open(self.config_file, 'r')
+            for line in LOG:
+                cur_id = line.strip()
+
+    def read_log(self):
+        if os.path.isfile(self.config_file):
+            LOG = open(self.config_file, 'r')
+            for line in LOG:
+                cur_id = line.strip()
+                if cur_id not in self.exist_ids:
+                    self.exist_ids.append(cur_id)
+
+    def isNewID(self, data_id):
+        return data_id in self.exist_ids
+
+    def getTargetIDs(self, target_file):
+        target_ids = []
+        if os.path.isfile(target_file):
+            Target = open(target_file, 'r')
+            for line in Target:
+                cur_ids = line.strip().replace('"',"").split(",")
+                for cid in cur_ids:
+                    cid = cid.strip()
+                    if not cid in self.exist_ids and cid not in target_ids:
+                        target_ids.append(cid)
+        return target_ids
+
+    """
+    This function filters the data from the output of ENCODE_data_explorer.py
+    and generates ENCODE ID list for downloading
+    Target file is the file gnereated by ENCODE_DataExplorer
+    """
+    def getTargetIDs2(self, target_file, filtered_file="", mini_len=35, ):
+        target_ids = []
+        size_dic = {}
+        file_dic = {}
+        line_dic = {}
+        if os.path.isfile(target_file):
+            Target = open(target_file, 'r')
+            for line in Target:
+                #print line
+                contents = line.split("\t")
+                if len(contents)>7:
+                    read_len = int(contents[7])
+                    file_size = int(contents[5])
+                    target = contents[8].strip()
+                    id1_s = contents[0].strip().replace('"',"")
+                    id2_s = contents[1].strip().replace('"',"")
+                    if target == "":
+                        target = id1_s
+                    cur_ids=""
+                    if id1_s!="":
+                        cur_ids = re.findall(r"[\w']+",id1_s)
+                    if id2_s!="":
+                        cur_ids += re.findall(r"[\w']+",id2_s)
+                    print cur_ids
+                    if read_len >= mini_len or read_len==0:
+                        if target not in size_dic:
+                            size_dic[target] = file_size
+                            file_dic[target] = cur_ids
+                            line_dic[target] = line
+                        elif int(size_dic[target])< file_size:
+                            size_dic[target] = file_size
+                            file_dic[target] = cur_ids
+                            line_dic[target] = line
+        for target in file_dic:
+            file_ls = file_dic[target]
+            print target+"\t"+",".join(file_ls)
+            for fid  in file_ls:
+                if fid not in self.exist_ids and fid not in target_ids:
+                    target_ids.append(fid)
+
+        if filtered_file != "":
+            FF = open(filtered_file, "w")
+            for target in line_dic:
+                line = line_dic[target]
+                FF.write(line)
+            FF.close()
+        return target_ids
+
+    def getBWTargetIDs2(self, target_file, filtered_file="", mini_len=35, ):
+        target_ids = []
+        size_dic = {}
+        file_dic = {}
+        line_ls = []
+        if os.path.isfile(target_file):
+
+            Target = open(target_file, 'r')
+            for line in Target:
+                #print line
+                contents = line.split("\t")
+                if len(contents)>7:
+                    read_len = int(contents[7])
+                    file_size = int(contents[5])
+                    target = contents[8].strip()
+
+                    id1 = contents[0].strip().replace('"',"")
+                    if id1 not in target_ids and id1 not in self.exist_ids:
+                        target_ids.append(id1)
+                        line_ls.append(line)
+                    id2 = contents[1].strip().replace('"',"")
+                    if id2 not in target_ids and id2 not in self.exist_ids:
+                        target_ids.append(id2)
+                        line_ls.append(line)
+
+
+        if filtered_file != "":
+            FF = open(filtered_file, "w")
+            for line in line_ls:
+                FF.write(line)
+            FF.close()
+        return target_ids
+
+
+
+    def getFastqDumpCommand(self, srr_id):
+        command =  'fastq-dump --outdir '+self.data_dir+' --gzip --skip-technical --dumpbase --split-files --clip '+ srr_id+"\n"
+        command += 'echo '+srr_id+" >> "+self.config_file+"\n"
+        return command
+
+    def getEncodeCommand(self, encode_id, ext="fastq.gz"):
+
+        # https://www.encodeproject.org/files/ENCFF434PLO/@@download/ENCFF434PLO.fastq.gz
+        # ENCFF139SOU.fastq.gz
+        command =  'wget -a '+self.root_dir+"/wget.log"+' https://www.encodeproject.org/files/'+encode_id+'/@@download/'+encode_id+"."+ext+" -O "+self.data_dir+"/"+encode_id+"."+ext+"\n"
+        command += 'echo '+encode_id+" >> "+self.config_file+"\n"
+        return command
+
+    def getType(self, id):
+        if id.startswith("SRR"):
+            return "SRA"
+        elif id.startswith("ENC"):
+            return "ENCODE"
+        else:
+            return "UNKNOWN"
+
+    # Get statues
+    def getAllDownloadFiles(self):
+        if os.path.isdir(self.data_dir):
+            download_files = [f for f in listdir(self.data_dir) if isfile(join(self.data_dir, f)) and f.endswith(self.ftype)]
+            return download_files
+
+    def getAllLogFiles(self):
+        logfiles= [];
+        if os.path.isfile(self.config_file):
+            LOG = open(self.config_file, 'r')
+            for line in LOG:
+                cur_id = line.strip()
+                logfiles.append(cur_id)
+        return logfiles
+
+    def showStatues(self, recove_log = False, synconized_log = False):
+        logfiles = self.getAllLogFiles()
+        downloadFiles = self.getAllDownloadFiles()
+        d_files = []
+        d_files_nums = []
+        d_file_in_logs = []
+        print "id\tdata_files_number\texist_in_log"
+        if downloadFiles:
+            for d_file in downloadFiles:
+                m = re.match('(\w+)_\d{1}\.'+self.ftype, d_file)
+                if not m:
+                    m = re.match('(EN\w+).'+self.ftype, d_file)
+                if m:
+                    id = m.group(1)
+                    if id not in d_files:
+                        d_files.append(id)
+                        d_files_nums.append(1)
+                        if id in logfiles:
+                            d_file_in_logs.append(1)
+                        else:
+                            d_file_in_logs.append(0)
+                    else:
+                        d_files_nums[d_files.index(id)]+=1
+        for i in range(len(d_files)):
+            print d_files[i]+"\t"+str(d_files_nums[i])+"\t"+str(d_file_in_logs[i])
+        log_only_files = list(set(logfiles) - set(d_files))
+        for k in range(len(log_only_files)):
+            print log_only_files[k]+"\t0\t0"
+
+        if recove_log:
+            LOG = open(self.config_file, 'w')
+            for df in downloadFiles:
+                LOG.write(df+'\n')
+            LOG.close()
+
+        if synconized_log:
+            # Remove files which were not completedly downloading.
+            incomplete_files = list(set(d_files)-set(logfiles))
+            for ifile in incomplete_files:
+                possible_file_paths = [];
+                possible_file_paths.append(self.data_dir+"/"+ifile+"_1."+self.ftype)
+                possible_file_paths.append(self.data_dir+"/"+ifile+"_2."+self.ftype)
+                possible_file_paths.append(self.data_dir+"/"+ifile+"."+self.ftype)
+                try:
+                    for path in possible_file_paths:
+                        if os.path.isfile(path):
+                            fsize = os.path.getsize(path)
+                            if fsize<10000000:
+                                os.remove(path)
+                            else:
+                                print "The file "+path+" is big , please deleted it manually!"
+                except Exception as e:
+                    print(e.message)
+
+
+            # Write downloaded files in log file.
+            self.exist_ids = []
+            try:
+                LOG = open(self.config_file, 'w')
+                for df in d_files:
+                    LOG.write(df+"\n")
+                    self.exist_ids.append(df)
+                LOG.close()
+            except Exception as e:
+                print(e)
+
+    def createCommandFile(self, target_id_ls, ext):
+        try:
+            #Remove the downloaded files from final list
+            id_ls = list(set(target_id_ls)-set(self.exist_ids))
+            print ("There are "+str(len(id_ls))+" samples will be downloaded!");
+            # raw_input returns the empty string for "enter"
+
+            command = "rm -f "+self.cmd_dir+"/*.sh"
+            status, output = commands.getstatusoutput(command)
+            if status == 0:
+                index = 0
+                combine_cmd_file = self.cmd_dir + "/combined.sh"
+                combine_pid_file = self.cmd_dir + "/pid.txt"
+                COMBINE = open(combine_cmd_file, 'w')
+                cmd_file_ls = {}
+                for sample_id in id_ls:
+                    cmd_index = index % self.thread_num
+                    file_name = self.cmd_dir+"/download_"+str(cmd_index)+".sh"
+                    if not os.path.isfile(file_name):
+                        ACTIONFILE = open(file_name, 'w')
+                        ACTIONFILE.write('#!/bin/bash\n')
+                        ACTIONFILE.close()
+                    if file_name not in cmd_file_ls:
+                        cmd_file_ls[file_name] = file_name
+                        COMBINE.write("nohup bash "+file_name+ " > "+self.repository_dir+"/nohup.log 2>&1 &\n")
+                        COMBINE.write("echo $! >> " + combine_pid_file + "\n")
+                    ACTIONFILE = open(file_name, 'a')
+                    if sample_id.startswith("SRR"):
+                        ACTIONFILE.write(self.getFastqDumpCommand(sample_id))
+                    elif sample_id.startswith("ENC"):
+                        ACTIONFILE.write(self.getEncodeCommand(sample_id,ext))
+                    index += 1
+                    ACTIONFILE.close()
+                COMBINE.close()
+                command = "chmod +x " + self.cmd_dir + "/*.sh"
+                status, output = commands.getstatusoutput(command)
+        except Exception as e:
+            print(e)
+            
+            
+wk_dir  = "/media/hqyone/SeagateDrive2/HepG2/shRNA/bw"
+target_file = "/home/hqyone/workspace/code/rep_project_code/HepG2_shRNA_RNA_ali_h38_tophat_bw_list.txt"
+sr = Downloader(wk_dir, ftype = "bigWig")
+#"synconized_log = True" means the bash files will be regenerated based on synconized_log file
+sr.showStatues(synconized_log=True)
+test_srrd_ls = sr.getBWTargetIDs2(target_file)
+print test_srrd_ls
+sr.createCommandFile(test_srrd_ls, "bigWig")
+
+```
+
+
+
+## GEO database
+URL of GEO database: https://www.ncbi.nlm.nih.gov/geo/
+GEO database is also another big resource for NGS data
+1. You have to collect GEO ids manually and form a id list.
+  Firstly searching GEO database and find GSM IDs for you interested experiments.
+  Remember we will eventually download fastq/sra files form SRA database which is the backend of GEO
+  The reseason that we attached to GSM IDs instead of SRR ID (SRA Run ID) is that It is more easy to find GSM ID thand srr id for a experiment. 
+  Notice: It is important to find sample/control pair in this step.
+
+2. Then use Entrez Direct tools to generate manifest/download files in batch
+#### What is Entrez Direct tools?
+Entrez Direct (EDirect) is an advanced method for accessing the NCBI's set of interconnected Entrez databases (publication, nucleotide, protein, structure, gene, variation, expression, etc.) from a terminal window. It uses command-line arguments for the query terms and combines individual operations with UNIX pipes.
+
+```{python}
+EDirectHome = ""
+```
+
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
