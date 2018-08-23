@@ -96,7 +96,8 @@ class ENCODE_DataExplorer:
         exp_obj_ls = self.getExpList(URL)
         CONTROL_EXP_BAM_DIC = {}
         files_dic = {}
-        title = "files\tbam_files\tENCODE\texp_id\tassay\tfiles_size\trun_type\ttarget\tbiosample\torgam\tdescription\tderived_files\tgenome\tgenome_anno\n"
+        title = "#files\tbam_files\tENCODE\texp_id\tassay\tfiles_size\trun_type" \
+                "\ttarget\tbiosample\torgam\tdescription\tderived_files\tgenome\tgenome_anno\n"
         FILE.write(title)
         for exp_obj in exp_obj_ls[u'@graph']:
             exp_id = exp_obj[u'@id'].split('/')[2]
@@ -182,7 +183,7 @@ class ENCODE_DataExplorer:
         FILE.close()
         print ("The data sources extraction is done!")
 
-    def getBWFiles(self, control_file, URL, genome='GRCh38', output_type="unfiltered alignments", anno='V24', pepline=""， max_file_num=-1):
+    def getBWFiles(self, control_file, URL, genome='GRCh38', output_type="unfiltered alignments", anno='V24', pepline="",max_file_num=-1):
         #control_file = "./HepG2_eCLIP_source_list.txt"
         existed_ids = []
         if control_file!="" and os.path.isfile(control_file):
@@ -201,7 +202,7 @@ class ENCODE_DataExplorer:
         files_dic = {}
         begin=False
         exp_obj_ls.sort(key=lambda x: x[u'@id'], reverse=True)
-        title = "files\tbw_file\tENCODE\texp_id\tassay\tfiles_size\trun_type\ttarget\tbiosample\torgam\tdescription\tderived_files\tc_bam_file\tgenome\tgenome_anno\tnotes\n"
+        title = "#files\tbw_file\tENCODE\texp_id\tassay\tfiles_size\trun_type\ttarget\tbiosample\torgam\tdescription\tderived_files\tc_bam_file\tgenome\tgenome_anno\tnotes\n"
         FILE.write(title)
         file_num = 0;
         for exp_obj in exp_obj_ls:
@@ -324,18 +325,17 @@ class ENCODE_DataExplorer:
                                             FILE.write(a.encode('utf-8')+"\n")
                                             file_num+=1
                         files_dic[f] =f
-                        if (max_file_num>0 && file_num>=max_file_num){
-                            break;
-                        }
+            if (max_file_num>0 and file_num>=max_file_num):
+                break
         FILE.close()
         print ("The data sources extraction is done!")
-
+    # Get manifest file for FASTQ files
     def getFastqFiles(self, control_file, URL, withcontrol=True):
         #control_file = "./HepG2_eCLIP_source_list.txt"
         FILE = open(control_file,'w')
         exp_obj_ls = self.getExpList(URL)
         files_dic = {}
-        title = "files\tcontrol_files\tENCODE\texp_id\tassay\tfiles_size\trun_type\ttarget\tbiosample\torgam\tdescription\n"
+        title = "#files\tcontrol_files\tENCODE\texp_id\tassay\tfiles_size\trun_type\ttarget\tbiosample\torgam\tdescription\n"
         FILE.write(title)
         for exp_obj in exp_obj_ls[u'@graph']:
             exp_id =  exp_obj[u'@id'].split('/')[2]
@@ -399,10 +399,13 @@ K562_shRNA_RNA_URL = "https://www.encodeproject.org/search/?type=Experiment&stat
 HepG2_shRNA_RNA_URL = "https://www.encodeproject.org/search/?type=Experiment&biosample_term_name=HepG2&assay_title=shRNA+RNA-seq&limit=all"
 
 a = ENCODE_DataExplorer()
-
+#Other examples
 #a.getFastqFiles("./human_RNASeq_source_list.txt", human_RNA_Seq_URL)
 #a.getBamFiles("./K562_CHIP_hu38_ali_bam_source_list.txt", K562_CHIP_URL, genome='GRCh38', output_type="alignments", anno='V24')
-a.getBWFiles("", HepG2_shRNA_RNA_URL, genome='GRCh38', output_type="unfiltered alignments", anno='V24', pepline="tophat")
+a.getBWFiles("../data/ngs_datasource/hepg2_shRNA_10", HepG2_shRNA_RNA_URL, genome='GRCh38',
+             output_type="unfiltered alignments",
+             anno='V24', pepline="tophat", max_file_num= 10)
+exit(0)
 ```
 
 ### Step 2: Create bash files to download data files
@@ -483,6 +486,8 @@ class Downloader:
                 #print line
                 contents = line.split("\t")
                 if len(contents)>7:
+                    if line.startswith("#"):
+                        continue
                     read_len = int(contents[7])
                     file_size = int(contents[5])
                     target = contents[8].strip()
@@ -532,6 +537,8 @@ class Downloader:
                 #print line
                 contents = line.split("\t")
                 if len(contents)>7:
+                    if line.startswith("#"):
+                        continue
                     read_len = int(contents[7])
                     file_size = int(contents[5])
                     target = contents[8].strip()
@@ -696,16 +703,28 @@ class Downloader:
         except Exception as e:
             print(e)
             
-            
-wk_dir  = "/media/hqyone/SeagateDrive2/HepG2/shRNA/bw"
-target_file = "/home/hqyone/workspace/code/rep_project_code/HepG2_shRNA_RNA_ali_h38_tophat_bw_list.txt"
+"""
+Example for bam files
+wk_dir  = "/media/hqyone/SeagateDrive2/HepG2/shRNA/bam"
+sr = SRADownloader(wk_dir, ftype = "bam")
+sr.showStatues(synconized_log=True)
+test_srrd_ls = sr.getTargetIDs2("/home/hqyone/workspace/code/rep_project_code/HepG2_shRNA_RNA_ali_bam_list.txt")
+print test_srrd_ls
+sr.createCommandFile(test_srrd_ls, "bam")
+#test_srrd_ls = sr.getTargetIDs("./Mouseliver_12_29_ids.txt")
+
+"""
+#Here you have to use absolute path
+
+wk_dir  = "/Users/hqyone/GitHub/rep_project/data/ngs_datasource/HepG2/shRNA/bw"
+target_file = "/Users/hqyone/GitHub/rep_project/data/ngs_datasource/hepg2_shRNA_10"
 sr = Downloader(wk_dir, ftype = "bigWig")
 #"synconized_log = True" means the bash files will be regenerated based on synconized_log file
 sr.showStatues(synconized_log=True)
 test_srrd_ls = sr.getBWTargetIDs2(target_file)
 print test_srrd_ls
 sr.createCommandFile(test_srrd_ls, "bigWig")
-
+exit(0)
 ```
 
 
