@@ -741,9 +741,110 @@ GEO database is also another big resource for NGS data
 2. Then use Entrez Direct tools to generate manifest/download files in batch
 #### What is Entrez Direct tools?
 Entrez Direct (EDirect) is an advanced method for accessing the NCBI's set of interconnected Entrez databases (publication, nucleotide, protein, structure, gene, variation, expression, etc.) from a terminal window. It uses command-line arguments for the query terms and combines individual operations with UNIX pipes.
+Manual: https://www.ncbi.nlm.nih.gov/books/NBK179288/
+Notice: Add the path of edirct package into system PATH
+EDirect consists of a set of scripts that are downloaded to the user's computer. If you extract the archive in your home directory, you may need to enter:
+  PATH=$PATH:$HOME/edirect
 
 ```{python}
-EDirectHome = ""
+import subprocess
+import commands
+import shutil
+import distutils
+import os, errno, glob
+
+class GSM:
+    def __init__(self):
+        try:
+            self.acc = ""
+            self.submitter_acc=""
+            self.experiment_acc=""
+            self.study_acc =""
+            self.study_name=""
+            self.organism_id=""
+            self.organism_name=""
+            self.sample_acc=""
+            self.instrument=""
+            self.library_strategy=""
+            self.Instrument=""
+            self.createDate=""
+            self.updateDate=""
+            self.runs=[]
+        except Exception as e:
+            print(e.message)
+
+    def toString(self):
+        result =  self.acc+"\t"+self.submitter_acc+"\t"+self.experiment_acc+"\t"+self.study_acc+"\t"
+        result += self.study_name+"\t"+self.organism_id+"\t"+self.organism_name+"\t"+self.sample_acc+"\t"
+        result += self.instrument+"\t"+self.library_strategy+"\t"+self.Instrument+"\t"+self.createDate+"\t"
+        result += self.updateDate
+        if self.runs:
+            for i in self.runs:
+                result += '\t'+i.toString()
+        return result
+
+
+class GSM_Run:
+    def __init__(self):
+        self.acc = ""
+        # self.total_spots=""
+        # self.total_bases=""
+
+    def toString(self):
+        return self.acc
+
+class Edirect():
+    def __init__(self, edirect_dir):
+        self.eDIRECT =  edirect_dir
+        pass
+    def getGSM(self, gsm_id):
+        #gsm_id ='GSM1499151';
+        #esearch -db sra -query "GSM1204722" | efetch -format docsum| xtract -pattern DocumentSummary -element Submitter@acc Experiment@acc Organism@taxid Organism@ScientificName Study@acc Study@name LIBRARY_STRATEGY Platform@instrument_model Run@acc Run@total_spots Run@total_bases CreateDate UpdateDate
+        #command ='esearch -db sra -query "'+gsm_id+'"|efetch -format docsum| xtract -pattern DocumentSummary -element Submitter@acc Experiment@acc Organism@taxid Organism@ScientificName Sample@acc Study@acc Study@name LIBRARY_STRATEGY Platform@instrument_model Run@acc Run@total_spots Run@total_bases CreateDate UpdateDate'
+        #output = subprocess.check_output(command, shell=True)
+        Esearch =  self.eDIRECT+"/esearch"
+        Exfetch = self.eDIRECT + "/efetch"
+        Extract =  self.eDIRECT+"/xtract"
+        command = Esearch+' -db sra -query "'+gsm_id+'"|'+Exfetch+" -format docsum|"+\
+            Extract+' -pattern DocumentSummary -element Submitter@acc Experiment@acc Organism@taxid Organism@ScientificName Sample@acc Study@acc Study@name LIBRARY_STRATEGY Platform@instrument_model CreateDate UpdateDate Run@acc'
+        print (command)
+        status, output = commands.getstatusoutput(command)
+        #output = subprocess.check_output(command,shell=True)
+        #result_ls = list(commands.getstatusoutput(command))
+        output_ls = output.split('\t')
+        print(gsm_id+"\t#####\t"+output)
+        result = GSM()
+        if (len(output_ls)>11):
+            result.acc = gsm_id.strip()
+            result.submitter_acc = output_ls[0].strip()
+            result.experiment_acc = output_ls[1].strip()
+            result.sample_acc = output_ls[4].strip()
+            result.study_acc = output_ls[5].strip()
+            result.study_name = output_ls[6].strip()
+            result.organism_id = output_ls[2].strip()
+            result.organism_name = output_ls[3].strip()
+            result.library_strategy = output_ls[7].strip()
+            result.instrument = output_ls[8].strip()
+            result.createDate = output_ls[9].strip()
+            result.updateDate = output_ls[10].strip()
+            for x in range(11, len(output_ls)):
+                run_obj = GSM_Run()
+                run_obj.acc = output_ls[x].strip()
+                result.runs.append(run_obj)
+        else:
+            print ("Some thing wrong when query "+gsm_id)
+        return result
+#Test
+a = Edirect('/Users/hqyone/OneDrive/Software_Tools/software/edirect')
+result = a.getGSM('GSM1204722')
+print result.sample_acc
+```
+
+3. Download the FASTQ/SRA file form SRA datbase by fastq-dump program
+```{python}
+def getFastqDumpCommand(out_dir, srr_id):
+    return 'fastq-dump --outdir '+out_dir+' --gzip --skip-technical --dumpbase --split-files --clip '+ srr_id
+
 ```
 
 
